@@ -16,5 +16,8 @@ Whenever you want to push, or commit the changes you made to GitHub, do the foll
   2. git commit -m "message you want to put here"
   3. git push origin main (this is if creating issues and pull requests gives issues, just push to main. just try and make sure everything works before doing this.)
 
+When you want to get the recent changes that we've made and put it in your IDE, do the following:
+- git pull
+
 If we're gonna go the route of creating issues and using pull requests (to make sure things work before putting changes in the main branch), refer to the workflow file as it goes in more detail.
 
