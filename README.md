@@ -2,6 +2,7 @@
 - This is the shared repository for the UI/UX Design with Streamlit project. The group currently exists of Anthony, Omar and Massimo.
 
 **BEFORE ANYTHING, MAKE SURE YOU INSTALL GIT at https://git-scm.com/downloads**
+
 For simplicity's sake, the steps to use GitHub for this project is:
 
 - 1. "mkdir HCI-Final-Project" in the HCI folder we've been using all semester.
