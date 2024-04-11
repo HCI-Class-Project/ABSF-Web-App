@@ -3,7 +3,7 @@
 
 **BEFORE ANYTHING, MAKE SURE YOU INSTALL GIT at https://git-scm.com/downloads**
 
-For simplicity's sake, the steps to use GitHub for this project is:
+For simplicity's sake, the steps to use GitHub for this project is (do everything in the terminal):
 
 - 1. "mkdir HCI-Final-Project" in the HCI folder we've been using all semester.
   2. "cd HCI-Final-Project" to change directory to what you just created.
