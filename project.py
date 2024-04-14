@@ -2,11 +2,17 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from streamlit_folium import folium_static
 import folium
 from SPARQLWrapper import SPARQLWrapper, JSON
 import requests
+import openmeteo_requests
+import requests_cache
+from retry_requests import retry
 import wikidata.client as wd
+
+
 api_key = "18c47b661bmshc3d19b2803dc6bfp147f5ejsn896964c2cb32"
 api_host = "wft-geo-db.p.rapidapi.com"
 headers = {
@@ -14,8 +20,69 @@ headers = {
     "X-RapidAPI-Host": api_host
 }
 
+
+cache_session = requests_cache.CachedSession('.cache', expire_after = -1)
+retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
+openmeteo = openmeteo_requests.Client(session = retry_session)
+
+
 st.title("All About South Florida Web App")
-st.header("Streamlit, GeoDB Cities API, and Wikidata SPARQL Query")
+st.header("Streamlit, GeoDB Cities API, Open-Meteo API, and Wikidata SPARQL Query")
+
+@st.cache_data
+def get_wpb_weather_data():
+    #using lat and long of West Palm Beach
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": 26.7153,
+        "longitude": -80.0534,
+        "start_date": "1990-01-01",
+        "end_date": "2020-01-01",
+        "daily": ["temperature_2m_max", "temperature_2m_min", "temperature_2m_mean"],
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
+        "timezone": "America/New_York"
+    }
+    responses = openmeteo.weather_api(url, params=params)
+    return responses
+
+@st.cache_data
+def get_ftlaudy_weather_data():
+    #using lat and long of Fort Lauderdale
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": 26.1223,
+        "longitude": -80.1434,
+        "start_date": "1990-01-01",
+        "end_date": "2020-01-01",
+        "daily": ["temperature_2m_max", "temperature_2m_min", "temperature_2m_mean"],
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
+        "timezone": "America/New_York"
+    }
+    responses = openmeteo.weather_api(url, params=params)
+    return responses
+
+@st.cache_data
+def get_miami_weather_data():
+    #using lat and long of City of Miami
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": 25.7743,
+        "longitude": -80.1937,
+        "start_date": "1990-01-01",
+        "end_date": "2020-01-01",
+        "daily": ["temperature_2m_max", "temperature_2m_min", "temperature_2m_mean"],
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
+        "timezone": "America/New_York"
+    }
+    responses = openmeteo.weather_api(url, params=params)
+    return responses
+
 
 @st.cache_data
 def map_creator(attractions):
@@ -46,7 +113,8 @@ def get_south_fl_counties():
     return south_fl_counties_dict
 
 south_fl_counties_dict = get_south_fl_counties()
-south_fl_counties_name = [county['name'] for county in south_fl_counties_dict['data'] if county['name'] != 'County Club Acres']
+south_fl_counties_name = [county['name'] for county in south_fl_counties_dict['data']
+                          if county['name'] != 'County Club Acres']
 selected_county = st.selectbox('Select a county', south_fl_counties_name)
 st.info(f"Selected county: {selected_county}")
 
@@ -92,7 +160,8 @@ if selected_county == 'Palm Beach County':
             if gps_coordinates.startswith("Point(") and gps_coordinates.endswith(")"):
                 gps_coordinates = gps_coordinates[6:-1]
                 latitude, longitude = map(float, gps_coordinates.split(" ")[::-1])
-                attractions_data.append({'name': attraction_name, 'latitude': latitude, 'longitude': longitude})
+                attractions_data.append({'name': attraction_name,
+                                         'latitude': latitude, 'longitude': longitude})
                 st.write(f"- **{attraction_name}**: ({latitude}, {longitude})")
             else:
                 st.error(f"Invalid GPS coordinates format for attraction '{attraction_name}'.")
@@ -102,6 +171,67 @@ if selected_county == 'Palm Beach County':
         map = map_creator(attractions_data)
         st.subheader("Tourist Attractions Map")
         folium_static(map)
+
+        responses = get_wpb_weather_data()
+        response = responses[0]
+
+        daily = response.Daily()
+        daily_temperature_2m_max = daily.Variables(0).ValuesAsNumpy()
+        daily_temperature_2m_min = daily.Variables(1).ValuesAsNumpy()
+        daily_temperature_2m_mean = daily.Variables(2).ValuesAsNumpy()
+
+        daily_data = {"date": pd.date_range(
+            start=pd.to_datetime(daily.Time(), unit="s", utc=True),
+            end=pd.to_datetime(daily.TimeEnd(), unit="s", utc=True),
+            freq=pd.Timedelta(seconds=daily.Interval()),
+            inclusive="left"
+        )}
+        daily_data["temperature_2m_max"] = daily_temperature_2m_max
+        daily_data["temperature_2m_min"] = daily_temperature_2m_min
+        daily_data["temperature_2m_mean"] = daily_temperature_2m_mean
+        daily_dataframe = pd.DataFrame(data=daily_data)
+        daily_dataframe['date'] = pd.to_datetime(daily_dataframe['date'])
+        monthly_dataframe = daily_dataframe.resample('M', on='date').mean().reset_index()
+
+        st.subheader("Monthly Average Temperature Over Time")
+        fig1 = px.line(monthly_dataframe, x='date', y='temperature_2m_mean',
+                       title='Monthly Average Temperature Over Time')
+        st.plotly_chart(fig1)
+
+        st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
+        fig2 = go.Figure()
+
+        
+        fig2.add_trace(go.Scatter(
+            x=monthly_dataframe['date'],
+            y=monthly_dataframe['temperature_2m_max'],
+            fill='tozeroy',
+            mode='none',
+            line=dict(color='rgba(186, 0, 0, 0.7)'),
+            fillcolor='rgba(186, 0, 0, 0.3)',
+            name='Maximum Temperature'
+        ))
+        fig2.update_traces(hoverlabel=dict(font=dict(color='white')))
+
+        fig2.add_trace(go.Scatter(
+            x=monthly_dataframe['date'],
+            y=monthly_dataframe['temperature_2m_min'],
+            fill='tozeroy',
+            mode='none',
+            line=dict(color='rgba(0, 0, 255, 0.7)'),
+            fillcolor='rgba(0, 0, 255, 0.3)',
+            name='Minimum Temperature'
+        ))
+        fig2.update_traces(hoverlabel=dict(font=dict(color='white')))
+
+        fig2.update_layout(
+            title='Maximum and Minimum Temperatures Over Time',
+            xaxis_title='Date',
+            yaxis_title='Temperature (°F)',
+            yaxis_range=[70, 90]
+        )
+
+        st.plotly_chart(fig2)
     else:
         st.error("Failed to retrieve tourist attractions. Please try again later.")
 
@@ -151,7 +281,8 @@ elif selected_county == 'Broward County':
             if gps_coordinates.startswith("Point(") and gps_coordinates.endswith(")"):
                 gps_coordinates = gps_coordinates[6:-1]
                 latitude, longitude = map(float, gps_coordinates.split(" ")[::-1])
-                attractions_data.append({'name': attraction_name, 'latitude': latitude, 'longitude': longitude})
+                attractions_data.append({'name': attraction_name,
+                                         'latitude': latitude, 'longitude': longitude})
                 st.write(f"- **{attraction_name}**: ({latitude}, {longitude})")
             else:
                 st.error(f"Invalid GPS coordinates format for attraction '{attraction_name}'.")
@@ -161,6 +292,67 @@ elif selected_county == 'Broward County':
         map = map_creator(attractions_data)
         st.subheader("Tourist Attractions Map")
         folium_static(map)
+
+        responses = get_ftlaudy_weather_data()
+        response = responses[0]
+
+        daily = response.Daily()
+        daily_temperature_2m_max = daily.Variables(0).ValuesAsNumpy()
+        daily_temperature_2m_min = daily.Variables(1).ValuesAsNumpy()
+        daily_temperature_2m_mean = daily.Variables(2).ValuesAsNumpy()
+
+        daily_data = {"date": pd.date_range(
+            start=pd.to_datetime(daily.Time(), unit="s", utc=True),
+            end=pd.to_datetime(daily.TimeEnd(), unit="s", utc=True),
+            freq=pd.Timedelta(seconds=daily.Interval()),
+            inclusive="left"
+        )}
+        daily_data["temperature_2m_max"] = daily_temperature_2m_max
+        daily_data["temperature_2m_min"] = daily_temperature_2m_min
+        daily_data["temperature_2m_mean"] = daily_temperature_2m_mean
+        daily_dataframe = pd.DataFrame(data=daily_data)
+        daily_dataframe['date'] = pd.to_datetime(daily_dataframe['date'])
+        monthly_dataframe = daily_dataframe.resample('M', on='date').mean().reset_index()
+
+        st.subheader("Monthly Average Temperature Over Time")
+        fig1 = px.line(monthly_dataframe, x='date', y='temperature_2m_mean',
+                       title='Monthly Average Temperature Over Time')
+        st.plotly_chart(fig1)
+
+        st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
+        fig2 = go.Figure()
+
+        
+        fig2.add_trace(go.Scatter(
+            x=monthly_dataframe['date'],
+            y=monthly_dataframe['temperature_2m_max'],
+            fill='tozeroy',
+            mode='none',
+            line=dict(color='rgba(186, 0, 0, 0.7)'),
+            fillcolor='rgba(186, 0, 0, 0.3)',
+            name='Maximum Temperature'
+        ))
+        fig2.update_traces(hoverlabel=dict(font=dict(color='white')))
+
+        fig2.add_trace(go.Scatter(
+            x=monthly_dataframe['date'],
+            y=monthly_dataframe['temperature_2m_min'],
+            fill='tozeroy',
+            mode='none',
+            line=dict(color='rgba(0, 0, 255, 0.7)'),
+            fillcolor='rgba(0, 0, 255, 0.3)',
+            name='Minimum Temperature'
+        ))
+        fig2.update_traces(hoverlabel=dict(font=dict(color='white')))
+
+        fig2.update_layout(
+            title='Maximum and Minimum Temperatures Over Time',
+            xaxis_title='Date',
+            yaxis_title='Temperature (°F)',
+            yaxis_range=[70, 90]
+        )
+
+        st.plotly_chart(fig2)    
     else:
         st.error("Failed to retrieve tourist attractions. Please try again later.")
 
@@ -224,6 +416,67 @@ elif selected_county == 'Miami-Dade County':
         map = map_creator(attractions_data)
         st.subheader("Tourist Attractions Map")
         folium_static(map)
+
+        responses = get_miami_weather_data()
+        response = responses[0]
+
+        daily = response.Daily()
+        daily_temperature_2m_max = daily.Variables(0).ValuesAsNumpy()
+        daily_temperature_2m_min = daily.Variables(1).ValuesAsNumpy()
+        daily_temperature_2m_mean = daily.Variables(2).ValuesAsNumpy()
+
+        daily_data = {"date": pd.date_range(
+            start=pd.to_datetime(daily.Time(), unit="s", utc=True),
+            end=pd.to_datetime(daily.TimeEnd(), unit="s", utc=True),
+            freq=pd.Timedelta(seconds=daily.Interval()),
+            inclusive="left"
+        )}
+        daily_data["temperature_2m_max"] = daily_temperature_2m_max
+        daily_data["temperature_2m_min"] = daily_temperature_2m_min
+        daily_data["temperature_2m_mean"] = daily_temperature_2m_mean
+        daily_dataframe = pd.DataFrame(data=daily_data)
+        daily_dataframe['date'] = pd.to_datetime(daily_dataframe['date'])
+        monthly_dataframe = daily_dataframe.resample('M', on='date').mean().reset_index()
+
+        st.subheader("Monthly Average Temperature Over Time")
+        fig1 = px.line(monthly_dataframe, x='date', y='temperature_2m_mean',
+                       title='Monthly Average Temperature Over Time')
+        st.plotly_chart(fig1)
+
+        st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
+        fig2 = go.Figure()
+
+        
+        fig2.add_trace(go.Scatter(
+            x=monthly_dataframe['date'],
+            y=monthly_dataframe['temperature_2m_max'],
+            fill='tozeroy',
+            mode='none',
+            line=dict(color='rgba(186, 0, 0, 0.7)'),
+            fillcolor='rgba(186, 0, 0, 0.3)',
+            name='Maximum Temperature'
+        ))
+        fig2.update_traces(hoverlabel=dict(font=dict(color='white')))
+
+        fig2.add_trace(go.Scatter(
+            x=monthly_dataframe['date'],
+            y=monthly_dataframe['temperature_2m_min'],
+            fill='tozeroy',
+            mode='none',
+            line=dict(color='rgba(0, 0, 255, 0.7)'),
+            fillcolor='rgba(0, 0, 255, 0.3)',
+            name='Minimum Temperature'
+        ))
+        fig2.update_traces(hoverlabel=dict(font=dict(color='white')))
+
+        fig2.update_layout(
+            title='Maximum and Minimum Temperatures Over Time',
+            xaxis_title='Date',
+            yaxis_title='Temperature (°F)',
+            yaxis_range=[70, 90]
+        )
+
+        st.plotly_chart(fig2)    
     else:
         st.error("Failed to retrieve tourist attractions. Please try again later.")
 else:
