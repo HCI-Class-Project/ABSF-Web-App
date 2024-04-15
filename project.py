@@ -196,6 +196,8 @@ if selected_county == 'Palm Beach County':
         st.subheader("Monthly Average Temperature Over Time")
         fig1 = px.line(monthly_dataframe, x='date', y='temperature_2m_mean',
                        title='Monthly Average Temperature Over Time')
+        color = st.color_picker("Choose a color", "#081E3F")
+        fig1.update_traces(line_color = color)
         st.plotly_chart(fig1)
 
         st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
@@ -317,6 +319,8 @@ elif selected_county == 'Broward County':
         st.subheader("Monthly Average Temperature Over Time")
         fig1 = px.line(monthly_dataframe, x='date', y='temperature_2m_mean',
                        title='Monthly Average Temperature Over Time')
+        color = st.color_picker("Choose a color", "#081E3F")
+        fig1.update_traces(line_color=color)
         st.plotly_chart(fig1)
 
         st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
@@ -441,6 +445,8 @@ elif selected_county == 'Miami-Dade County':
         st.subheader("Monthly Average Temperature Over Time")
         fig1 = px.line(monthly_dataframe, x='date', y='temperature_2m_mean',
                        title='Monthly Average Temperature Over Time')
+        color = st.color_picker("Choose a color", "#081E3F")
+        fig1.update_traces(line_color=color)
         st.plotly_chart(fig1)
 
         st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
@@ -481,3 +487,11 @@ elif selected_county == 'Miami-Dade County':
         st.error("Failed to retrieve tourist attractions. Please try again later.")
 else:
     st.error("Invalid county. Please try again later.")
+
+rate_answer = st.radio("Would you like to rate your experience?", ["Yes", "No"], index=None)
+if rate_answer == "Yes":
+    rating = st.slider('Rate your experience with our web app!', 0, 5, 2)
+    if rating:
+        st.success("Thank you for your feedback!")
+elif rate_answer == "No":
+    st.info("Thank you for your time!")
