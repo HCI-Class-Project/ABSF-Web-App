@@ -27,7 +27,9 @@ openmeteo = openmeteo_requests.Client(session = retry_session)
 
 
 st.title("All About South Florida Web App")
-st.header("Streamlit, GeoDB Cities API, Open-Meteo API, and Wikidata SPARQL Query")
+st.write("Streamlit, GeoDB Cities API, Open-Meteo API, and Wikidata SPARQL Query")
+
+st.divider()
 
 @st.cache_data
 def get_wpb_weather_data():
@@ -37,7 +39,7 @@ def get_wpb_weather_data():
         "latitude": 26.7153,
         "longitude": -80.0534,
         "start_date": "1990-01-01",
-        "end_date": "2020-01-01",
+        "end_date": "2024-04-10",
         "daily": ["temperature_2m_max", "temperature_2m_min", "temperature_2m_mean"],
         "temperature_unit": "fahrenheit",
         "wind_speed_unit": "mph",
@@ -55,7 +57,7 @@ def get_ftlaudy_weather_data():
         "latitude": 26.1223,
         "longitude": -80.1434,
         "start_date": "1990-01-01",
-        "end_date": "2020-01-01",
+        "end_date": "2024-04-10",
         "daily": ["temperature_2m_max", "temperature_2m_min", "temperature_2m_mean"],
         "temperature_unit": "fahrenheit",
         "wind_speed_unit": "mph",
@@ -73,7 +75,7 @@ def get_miami_weather_data():
         "latitude": 25.7743,
         "longitude": -80.1937,
         "start_date": "1990-01-01",
-        "end_date": "2020-01-01",
+        "end_date": "2024-04-10",
         "daily": ["temperature_2m_max", "temperature_2m_min", "temperature_2m_mean"],
         "temperature_unit": "fahrenheit",
         "wind_speed_unit": "mph",
@@ -294,7 +296,9 @@ elif selected_county == 'Broward County':
         map = map_creator(attractions_data)
         st.subheader("Tourist Attractions Map")
         folium_static(map)
-
+        
+        st.divider()
+        
         responses = get_ftlaudy_weather_data()
         response = responses[0]
 
@@ -321,6 +325,12 @@ elif selected_county == 'Broward County':
                        title='Monthly Average Temperature Over Time')
         color = st.color_picker("Choose a color", "#081E3F")
         fig1.update_traces(line_color=color)
+
+        fig1.update_layout(
+            xaxis_title='Date',
+            yaxis_title='Temperature (°F) Mean',
+            yaxis_range=[55, 90]
+        )
         st.plotly_chart(fig1)
 
         st.subheader("Mean Maximum and Minimum Monthly Temperature Over Time")
@@ -487,6 +497,8 @@ elif selected_county == 'Miami-Dade County':
         st.error("Failed to retrieve tourist attractions. Please try again later.")
 else:
     st.error("Invalid county. Please try again later.")
+
+st.divider()
 
 rate_answer = st.radio("Would you like to rate your experience?", ["Yes", "No"], index=None)
 if rate_answer == "Yes":
