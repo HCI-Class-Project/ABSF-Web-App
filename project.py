@@ -504,6 +504,8 @@ rate_answer = st.radio("Would you like to rate your experience?", ["Yes", "No"],
 if rate_answer == "Yes":
     rating = st.slider('Rate your experience with our web app!', 0, 5, 2)
     if rating:
-        st.success("Thank you for your feedback!")
+        submit = st.button("Submit")
+        if submit:
+            st.success("Thank you for your feedback!")
 elif rate_answer == "No":
     st.info("Thank you for your time!")
