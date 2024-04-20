@@ -568,7 +568,7 @@ with raw_weather:
                 if start_date_raw < pd.to_datetime('1970-01-01') or end_date_raw > pd.to_datetime('2020-01-01'):
                     raise ValueError("Dates should be within the range from 01/1970 to 01/2020.")
                 elif (end_date_raw - start_date_raw).days < 58:
-                    raise ValueError("End date must be 2 months greater than start date.")
+                    raise ValueError("End date must be at least 2 months greater than start date.")
 
                 elif start_date_raw is not None and end_date_raw is not None:
                     if selected_county == 'Palm Beach County':
